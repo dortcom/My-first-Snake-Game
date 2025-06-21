@@ -5,61 +5,105 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Snake Game - FREE-SKY CREATION</title>
   <style>
-    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: sans-serif;
+      background: #111;
+      color: white;
       display: flex;
       flex-direction: column;
       align-items: center;
-      background: #f0f0f0;
     }
+
     h1 {
       margin-top: 20px;
-      color: #333;
     }
-    #gameCanvas {
-      border: 2px solid #333;
-      background: #000;
+
+    canvas {
+      background: black;
+      border: 2px solid white;
     }
-    .controls {
+
+    .level-select {
       margin-top: 10px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
     }
-    .controls button {
-      padding: 10px 20px;
-      font-size: 18px;
-      border: none;
-      border-radius: 8px;
-      background-color: #28a745;
-      color: white;
-      cursor: pointer;
-    }
+
     .progress-container {
       width: 80%;
-      height: 20px;
-      background: #ccc;
+      height: 15px;
+      background: #333;
       border-radius: 10px;
-      margin-top: 15px;
-      overflow: hidden;
+      margin-top: 10px;
     }
+
     .progress-bar {
       height: 100%;
       background: green;
       width: 0%;
+      transition: width 0.3s;
+      border-radius: 10px;
     }
-    .level-select {
-      margin: 10px;
+
+    .controls {
+      display: grid;
+      grid-template-columns: 60px 60px 60px;
+      grid-template-rows: 60px 60px 60px;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .controls button {
+      font-size: 20px;
+      background-color: #444;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .controls .pause {
+      background-color: orange;
+    }
+
+    .blank {
+      visibility: hidden;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 120px;
+      background-color: rgba(0,0,0,0.8);
+      color: white;
+      font-size: 24px;
+      padding: 30px;
+      border-radius: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    .overlay button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: orange;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .fail {
+      color: red;
+    }
+
+    .success {
+      color: green;
     }
   </style>
 </head>
 <body>
-  <h1>FREE-SKY Snake Game</h1>
+  <h1>Snake Game</h1>
+
   <div class="level-select">
-    <label for="difficulty">Choose Difficulty: </label>
     <select id="difficulty">
       <option value="easy">Easy</option>
       <option value="medium">Medium</option>
@@ -67,74 +111,90 @@
     </select>
     <button onclick="startGame()">Start Game</button>
   </div>
-  <canvas id="gameCanvas" width="400" height="400"></canvas>
+
   <div class="progress-container">
     <div id="progressBar" class="progress-bar"></div>
   </div>
+
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+
   <div class="controls">
-    <button onclick="changeDirection('up')">Up</button>
-    <button onclick="changeDirection('left')">Left</button>
-    <button onclick="changeDirection('right')">Right</button>
-    <button onclick="changeDirection('down')">Down</button>
-    <button onclick="togglePause()">Pause</button>
+    <div class="blank"></div>
+    <button onclick="changeDirection('up')">↑</button>
+    <div class="blank"></div>
+
+    <button onclick="changeDirection('left')">←</button>
+    <button class="pause" onclick="togglePause()">⏸</button>
+    <button onclick="changeDirection('right')">→</button>
+
+    <div class="blank"></div>
+    <button onclick="changeDirection('down')">↓</button>
+    <div class="blank"></div>
   </div>
+
+  <div id="overlay" class="overlay"></div>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const box = 20;
-    let snake = [];
-    let direction = "right";
-    let food = {};
-    let score = 0;
-    let level = 1;
-    let maxFoodPerLevel = 30;
-    let foodEaten = 0;
-    let speed = 1000;
-    let interval;
-    let paused = false;
-
     const progressBar = document.getElementById("progressBar");
+    const overlay = document.getElementById("overlay");
 
-    const levels = {
-      easy: { speed: 1000, increment: 0.1, maxLevel: 15 },
-      medium: { speed: 700, increment: 0.1, maxLevel: 15 },
-      hard: { speed: 400, increment: 0.1, maxLevel: 15 },
-    };
+    const box = 20;
+    let snake, direction, food, interval;
+    let foodEaten = 0, level = 1, speed = 1000, walls = [];
+    let gameOver = false, paused = false, difficulty = "easy";
+    let maxLevels = { easy: 15, medium: 12, hard: 10 };
+
+    const wallStyles = [
+      "solid", "dashed", "dotted", "double", "groove", "ridge"
+    ];
 
     function startGame() {
-      const difficulty = document.getElementById("difficulty").value;
-      const setting = levels[difficulty];
+      difficulty = document.getElementById("difficulty").value;
+      level = 1;
+      speed = difficulty === "easy" ? 1000 : difficulty === "medium" ? 800 : 600;
+      init();
+    }
 
-      speed = setting.speed;
+    function init() {
       snake = [{ x: 200, y: 200 }];
       direction = "right";
       foodEaten = 0;
-      level = 1;
-      score = 0;
-
+      walls = [];
+      paused = false;
+      gameOver = false;
+      overlay.style.display = "none";
+      progressBar.style.width = "0%";
       placeFood();
+      if (difficulty !== "easy") generateWalls();
       clearInterval(interval);
       interval = setInterval(draw, speed);
+    }
+
+    function generateWalls() {
+      const count = 5 + level;
+      walls = [];
+      for (let i = 0; i < count; i++) {
+        let wall = {
+          x: Math.floor(Math.random() * (canvas.width / box)) * box,
+          y: Math.floor(Math.random() * (canvas.height / box)) * box
+        };
+        walls.push(wall);
+      }
+      canvas.style.borderStyle = wallStyles[level % wallStyles.length];
     }
 
     function placeFood() {
       food = {
         x: Math.floor(Math.random() * (canvas.width / box)) * box,
-        y: Math.floor(Math.random() * (canvas.height / box)) * box,
+        y: Math.floor(Math.random() * (canvas.height / box)) * box
       };
     }
 
     function changeDirection(dir) {
-      const opposite = {
-        up: "down",
-        down: "up",
-        left: "right",
-        right: "left",
-      };
-      if (dir !== opposite[direction]) {
-        direction = dir;
-      }
+      const opposite = { up: "down", down: "up", left: "right", right: "left" };
+      if (dir !== opposite[direction]) direction = dir;
     }
 
     function togglePause() {
@@ -142,44 +202,30 @@
     }
 
     function draw() {
-      if (paused) return;
+      if (paused || gameOver) return;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Move Snake
-      let head = { ...snake[0] };
-      if (direction === "right") head.x += box;
-      if (direction === "left") head.x -= box;
+      // Move
+      const head = { ...snake[0] };
       if (direction === "up") head.y -= box;
       if (direction === "down") head.y += box;
+      if (direction === "left") head.x -= box;
+      if (direction === "right") head.x += box;
 
-      // Wall Collision
-      if (head.x < 0 || head.y < 0 || head.x >= canvas.width || head.y >= canvas.height) {
+      // Check walls
+      if (head.x < 0 || head.y < 0 || head.x >= canvas.width || head.y >= canvas.height ||
+        (difficulty !== "easy" && walls.some(w => w.x === head.x && w.y === head.y)) ||
+        snake.some((s, i) => i && s.x === head.x && s.y === head.y)) {
+        gameOver = true;
         clearInterval(interval);
-        alert("Game Over - Hit wall!");
+        showOverlay("You Failed!", true, false);
         return;
       }
 
-      // Self Collision
-      for (let i = 1; i < snake.length; i++) {
-        if (snake[i].x === head.x && snake[i].y === head.y) {
-          clearInterval(interval);
-          alert("Game Over - Self hit!");
-          return;
-        }
-      }
-
-      // Eat food
+      // Eat
       if (head.x === food.x && head.y === food.y) {
         foodEaten++;
-        score++;
-        if (foodEaten >= maxFoodPerLevel) {
-          level++;
-          foodEaten = 0;
-          speed = Math.max(100, speed - speed * 0.1);
-          clearInterval(interval);
-          interval = setInterval(draw, speed);
-        }
         placeFood();
       } else {
         snake.pop();
@@ -187,25 +233,54 @@
 
       snake.unshift(head);
 
-      // Draw snake like body curve
-      ctx.fillStyle = "lime";
-      snake.forEach((part, index) => {
-        ctx.beginPath();
-        ctx.arc(part.x + box / 2, part.y + box / 2, box / 2 - 2, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      // Progress
+      const percent = (foodEaten / 30) * 100;
+      progressBar.style.width = percent + "%";
 
-      // Draw food
+      if (foodEaten >= 30) {
+        clearInterval(interval);
+        if (level >= maxLevels[difficulty]) {
+          showOverlay("Game Completed ✅", false, false);
+        } else {
+          showOverlay("Level Completed ✅", false, true);
+        }
+        return;
+      }
+
+      // Draw
+      ctx.fillStyle = "lime";
+      snake.forEach(s =>
+        ctx.beginPath(), ctx.arc(s.x + box / 2, s.y + box / 2, box / 2 - 2, 0, Math.PI * 2), ctx.fill()
+      );
+
       ctx.fillStyle = "red";
       ctx.beginPath();
       ctx.arc(food.x + box / 2, food.y + box / 2, box / 2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Update progress bar
-      progressBar.style.width = `${(foodEaten / maxFoodPerLevel) * 100}%`;
+      // Draw walls
+      if (difficulty !== "easy") {
+        ctx.fillStyle = "gray";
+        walls.forEach(w => ctx.fillRect(w.x, w.y, box, box));
+      }
     }
 
-    // Optional: Keyboard controls
+    function showOverlay(message, failed, nextLevel) {
+      overlay.innerHTML = `<div class="${failed ? 'fail' : 'success'}">${message}</div>`;
+      if (failed) {
+        overlay.innerHTML += `<button onclick="init()">Try Again 🔁</button>`;
+      } else if (nextLevel) {
+        overlay.innerHTML += `<button onclick="nextLevel()">Continue</button>`;
+      }
+      overlay.style.display = "block";
+    }
+
+    function nextLevel() {
+      level++;
+      speed = speed * 0.9;
+      init();
+    }
+
     document.addEventListener("keydown", e => {
       if (e.key === "ArrowUp") changeDirection("up");
       if (e.key === "ArrowDown") changeDirection("down");
