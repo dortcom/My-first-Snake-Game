@@ -17,11 +17,13 @@
 
     h1 {
       margin-top: 20px;
+    
     }
 
     canvas {
       background: black;
       border: 2px solid white;
+      display: block;
     }
 
     .level-select {
@@ -72,13 +74,14 @@
     .overlay {
       position: absolute;
       top: 120px;
-      background-color: rgba(0,0,0,0.8);
+      background-color: rgba(0,0,0,0.85);
       color: white;
       font-size: 24px;
       padding: 30px;
       border-radius: 10px;
       text-align: center;
       display: none;
+      z-index: 10;
     }
 
     .overlay button {
@@ -101,7 +104,7 @@
   </style>
 </head>
 <body>
-  <h1>Snake Game</h1>
+  <h1>OMUNA_DORTMUNDSnake Game</h1>
 
   <div class="level-select">
     <select id="difficulty">
@@ -141,10 +144,18 @@
     const overlay = document.getElementById("overlay");
 
     const box = 20;
-    let snake, direction, food, interval;
-    let foodEaten = 0, level = 1, speed = 1000, walls = [];
-    let gameOver = false, paused = false, difficulty = "easy";
-    let maxLevels = { easy: 15, medium: 12, hard: 10 };
+    let snake = [];
+    let direction = "right";
+    let food = {};
+    let interval;
+    let foodEaten = 0;
+    let level = 1;
+    let speed = 1000;
+    let walls = [];
+    let paused = false;
+    let gameOver = false;
+    let difficulty = "easy";
+    const maxLevels = { easy: 15, medium: 12, hard: 10 };
 
     const wallStyles = [
       "solid", "dashed", "dotted", "double", "groove", "ridge"
@@ -153,7 +164,7 @@
     function startGame() {
       difficulty = document.getElementById("difficulty").value;
       level = 1;
-      speed = difficulty === "easy" ? 1000 : difficulty === "medium" ? 800 : 600;
+      speed = (difficulty === "easy") ? 1000 : (difficulty === "medium") ? 800 : 600;
       init();
     }
 
@@ -173,14 +184,13 @@
     }
 
     function generateWalls() {
-      const count = 5 + level;
+      const count = 4 + level;
       walls = [];
       for (let i = 0; i < count; i++) {
-        let wall = {
+        walls.push({
           x: Math.floor(Math.random() * (canvas.width / box)) * box,
           y: Math.floor(Math.random() * (canvas.height / box)) * box
-        };
-        walls.push(wall);
+        });
       }
       canvas.style.borderStyle = wallStyles[level % wallStyles.length];
     }
@@ -194,7 +204,9 @@
 
     function changeDirection(dir) {
       const opposite = { up: "down", down: "up", left: "right", right: "left" };
-      if (dir !== opposite[direction]) direction = dir;
+      if (dir !== opposite[direction]) {
+        direction = dir;
+      }
     }
 
     function togglePause() {
@@ -206,24 +218,24 @@
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Move
+      // Move head
       const head = { ...snake[0] };
       if (direction === "up") head.y -= box;
       if (direction === "down") head.y += box;
       if (direction === "left") head.x -= box;
       if (direction === "right") head.x += box;
 
-      // Check walls & collisions
+      // Check collisions
       if (head.x < 0 || head.y < 0 || head.x >= canvas.width || head.y >= canvas.height ||
           (difficulty !== "easy" && walls.some(w => w.x === head.x && w.y === head.y)) ||
-          snake.some((s, i) => i && s.x === head.x && s.y === head.y)) {
+          snake.slice(1).some(part => part.x === head.x && part.y === head.y)) {
         gameOver = true;
         clearInterval(interval);
         showOverlay("You Failed!", true, false);
         return;
       }
 
-      // Eat
+      // Eat food
       if (head.x === food.x && head.y === food.y) {
         foodEaten++;
         placeFood();
@@ -233,9 +245,8 @@
 
       snake.unshift(head);
 
-      // Progress
-      const percent = (foodEaten / 30) * 100;
-      progressBar.style.width = percent + "%";
+      // Progress bar update
+      progressBar.style.width = `${(foodEaten / 30) * 100}%`;
 
       if (foodEaten >= 30) {
         clearInterval(interval);
@@ -247,11 +258,11 @@
         return;
       }
 
-      // Draw snake in green
+      // Draw snake
       ctx.fillStyle = "lime";
-      snake.forEach(s => {
+      snake.forEach(part => {
         ctx.beginPath();
-        ctx.arc(s.x + box / 2, s.y + box / 2, box / 2 - 2, 0, Math.PI * 2);
+        ctx.arc(part.x + box / 2, part.y + box / 2, box / 2 - 2, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -263,7 +274,7 @@
 
       // Draw walls
       if (difficulty !== "easy") {
-        ctx.fillStyle = "gray";
+        ctx.fillStyle = "#555";
         walls.forEach(w => ctx.fillRect(w.x, w.y, box, box));
       }
     }
@@ -280,7 +291,7 @@
 
     function nextLevel() {
       level++;
-      speed = speed * 0.9;
+      speed *= 0.9;
       init();
     }
 
